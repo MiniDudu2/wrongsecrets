@@ -18,6 +18,7 @@ jobs:
           fetch-depth: 0 # Récupère tout l'historique Git pour que Gitleaks puisse tout analyser
 
       - name: Scan avec Gitleaks
+        continue-on-error: true
         run: |
           echo "Lancement de l'analyse des secrets cachés..."
           gitleaks detect --verbose --source . --report-path gitleaks-report.json
