@@ -10,19 +10,18 @@ jobs:
   # --- ÉTAPE 1 : AUDIT DE SÉCURITÉ (Shift-Left) ---
   security-audit:
     name: 1. Audit & Scan de Secrets
-    runs-on: self-hosted # Force l'exécution sur ton conteneur Proxmox
+    runs-on: self-hosted
     steps:
       - name: Checkout du code source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Récupère tout l'historique Git pour que Gitleaks puisse tout analyser
+          fetch-depth: 0
 
       - name: Scan avec Gitleaks
         continue-on-error: true
         run: |
           echo "Lancement de l'analyse des secrets cachés..."
           gitleaks detect --verbose --source . --report-path gitleaks-report.json
-        # continue-on-error: true # Optionnel : décommente cette ligne si tu veux que la pipeline continue même si Gitleaks trouve des failles
 
       - name: Conserver le rapport d'analyse (Objectif du TP)
         if: always()
@@ -32,10 +31,11 @@ jobs:
           path: gitleaks-report.json
           retention-days: 7
 
-  # --- ÉTAPE 2 : AUTHENTIFICATION VAULT & RECOVERY ---
+  # --- ÉTAPE 2 : AUTHENTIFICATION VAULT & DÉPLOIEMENT ---
   build-and-secure:
     name: 2. Récupération Vault & Build
-    needs: security-audit # Attend que le scan soit terminé
+    needs: security-audit
+    if: always()
     runs-on: self-hosted
     steps:
       - name: Checkout du code source
@@ -48,7 +48,6 @@ jobs:
           method: approle
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          # On liste ici les secrets à extraire et les variables d'environnement à créer à la volée
           secrets: |
             secret/data/wrongsecrets db_password | DB_PASSWORD ;
             secret/data/wrongsecrets api_key | API_KEY
@@ -60,13 +59,14 @@ jobs:
             echo "Échec : Impossible de récupérer le secret de production."
             exit 1
           else
-            echo "Succès : Le secret a été injecté en mémoire vive de manière dynamique."
-            # Note : GitHub Actions va automatiquement masquer la valeur dans les logs par sécurité (***)
+            echo "Succès : Le secret a été injecté en mémoire vive."
             echo "Aperçu masqué de la variable : $DB_PASSWORD"
           fi
 
-      # Cette étape prépare le terrain pour la suite (Nœud 3)
-      - name: Simulation de Build Docker
+      - name: Déploiement sécurisé sur le Nœud 3
         run: |
-          echo "Prêt pour le build de l'image de production."
-          # docker build -t wrongsecrets:v1 .
+          echo "Déploiement de l'application WrongSecrets..."
+          
+          sshpass -p "azerty" ssh -o StrictHostKeyChecking=no root@192.168.1.46 "docker run -d --name wrongsecrets-app -p 8080:8080 -e DB_PASSWORD=$DB_PASSWORD -e API_KEY=$API_KEY jeroenwillemsen/wrongsecrets:latest"
+          
+          echo "Déploiement terminé. L'application tourne avec les secrets injectés."
