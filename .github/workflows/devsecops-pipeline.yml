@@ -1,0 +1,70 @@
+name: DevSecOps WrongSecrets Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # --- ÉTAPE 1 : AUDIT DE SÉCURITÉ (Shift-Left) ---
+  security-audit:
+    name: 1. Audit & Scan de Secrets
+    runs-on: self-hosted # Force l'exécution sur ton conteneur Proxmox
+    steps:
+      - name: Checkout du code source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Récupère tout l'historique Git pour que Gitleaks puisse tout analyser
+
+      - name: Scan avec Gitleaks
+        run: |
+          echo "Lancement de l'analyse des secrets cachés..."
+          gitleaks detect --verbose --source . --report-path gitleaks-report.json
+        # continue-on-error: true # Optionnel : décommente cette ligne si tu veux que la pipeline continue même si Gitleaks trouve des failles
+
+      - name: Conserver le rapport d'analyse (Objectif du TP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-security-report
+          path: gitleaks-report.json
+          retention-days: 7
+
+  # --- ÉTAPE 2 : AUTHENTIFICATION VAULT & RECOVERY ---
+  build-and-secure:
+    name: 2. Récupération Vault & Build
+    needs: security-audit # Attend que le scan soit terminé
+    runs-on: self-hosted
+    steps:
+      - name: Checkout du code source
+        uses: actions/checkout@v4
+
+      - name: Connexion à HashiCorp Vault via AppRole
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          # On liste ici les secrets à extraire et les variables d'environnement à créer à la volée
+          secrets: |
+            secret/data/wrongsecrets db_password | DB_PASSWORD ;
+            secret/data/wrongsecrets api_key | API_KEY
+
+      - name: Vérification de l'injection sécurisée
+        run: |
+          echo "Vérification des variables récupérées depuis le coffre-fort..."
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "Échec : Impossible de récupérer le secret de production."
+            exit 1
+          else
+            echo "Succès : Le secret a été injecté en mémoire vive de manière dynamique."
+            # Note : GitHub Actions va automatiquement masquer la valeur dans les logs par sécurité (***)
+            echo "Aperçu masqué de la variable : $DB_PASSWORD"
+          fi
+
+      # Cette étape prépare le terrain pour la suite (Nœud 3)
+      - name: Simulation de Build Docker
+        run: |
+          echo "Prêt pour le build de l'image de production."
+          # docker build -t wrongsecrets:v1 .
