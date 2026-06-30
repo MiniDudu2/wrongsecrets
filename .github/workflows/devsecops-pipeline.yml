@@ -67,6 +67,6 @@ jobs:
         run: |
           echo "Déploiement de l'application WrongSecrets..."
           
-          sshpass -p "azerty" ssh -o StrictHostKeyChecking=no root@192.168.1.46 "docker run -d --name wrongsecrets-app -p 8080:8080 -e DB_PASSWORD=$DB_PASSWORD -e API_KEY=$API_KEY jeroenwillemsen/wrongsecrets:latest"
+          sshpass -p "azerty" ssh -o StrictHostKeyChecking=no root@10.131.1.138 "docker run -d --name wrongsecrets-app -p 8080:8080 -e DB_PASSWORD=$DB_PASSWORD -e API_KEY=$API_KEY jeroenwillemsen/wrongsecrets:latest"
           
           echo "Déploiement terminé. L'application tourne avec les secrets injectés."
