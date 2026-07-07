@@ -50,7 +50,8 @@ jobs:
           secretId: ${{ secrets.VAULT_SECRET_ID }}
           secrets: |
             secret/data/wrongsecrets db_password | DB_PASSWORD ;
-            secret/data/wrongsecrets api_key | API_KEY
+            secret/data/wrongsecrets api_key | API_KEY ;
+            secret/data/wrongsecrets ssh_password | SSH_PASSWORD
 
       - name: Vérification de l'injection sécurisée
         run: |
@@ -67,6 +68,6 @@ jobs:
         run: |
           echo "Déploiement de l'application WrongSecrets..."
           
-          sshpass -p "azerty" ssh -o StrictHostKeyChecking=no root@10.101.1.138 "docker run -d --name wrongsecrets-app -p 8080:8080 -e DB_PASSWORD=$DB_PASSWORD -e API_KEY=$API_KEY jeroenwillemsen/wrongsecrets:latest-no-vault"   
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no root@10.101.1.138 "docker rm -f wrongsecrets-app || true; docker run -d --name wrongsecrets-app -p 8080:8080 -e DB_PASSWORD=$DB_PASSWORD -e API_KEY=$API_KEY jeroenwillemsen/wrongsecrets:latest-no-vault"
           
           echo "Déploiement terminé. L'application tourne avec les secrets injectés."
