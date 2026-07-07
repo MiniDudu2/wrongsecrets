@@ -31,7 +31,7 @@ jobs:
           path: gitleaks-report.json
           retention-days: 7
 
-  # --- ÉTAPE 2 : AUTHENTIFICATION VAULT & DÉPLOIEMENT ---
+  # --- ÉTAPE 2 : AUTHENTIFICATION VAULT  ---
   build-and-secure:
     name: 2. Récupération Vault & Build
     needs: security-audit
@@ -63,7 +63,7 @@ jobs:
             echo "Succès : Le secret a été injecté en mémoire vive."
             echo "Aperçu masqué de la variable : $DB_PASSWORD"
           fi
-
+# --- ÉTAPE 3 : DÉPLOIEMENT APP ---
       - name: Déploiement sécurisé sur le Nœud 3
         run: |
           echo "Déploiement de l'application WrongSecrets..."
